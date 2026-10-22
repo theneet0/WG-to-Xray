@@ -63,6 +63,25 @@ function parseIntegerBase(part) {
 function parseReserved(value) {
   let clean = value.trim().replace(/^[\[\]]+|[\[\]]+$/g, "").trim();
   if (!clean) return [];
+
+  // Support 4-char base64 representation of 3 bytes (e.g. WARP reserved bytes)
+  if (/^[A-Za-z0-9+/]{4}={0,2}$/.test(clean)) {
+    try {
+      let bytes = [];
+      if (typeof Buffer !== "undefined") {
+        bytes = Array.from(Buffer.from(clean, "base64"));
+      } else if (typeof atob !== "undefined") {
+        const binStr = atob(clean);
+        for (let i = 0; i < binStr.length; i++) {
+          bytes.push(binStr.charCodeAt(i));
+        }
+      }
+      if (bytes.length === 3) {
+        return bytes;
+      }
+    } catch (_) {}
+  }
+
   const parts = clean.split(/[,\s]+/).filter(Boolean);
   const nums = [];
   for (const part of parts) {
@@ -118,6 +137,8 @@ function parseWireguardConfig(text) {
   const cleanText = text.replace(/^\uFEFF/, "");
   const lines = cleanText.split(/\r\n|\r|\n/);
 
+  const listKeys = ["address", "dns", "allowedips"];
+
   for (let i = 0; i < lines.length; i++) {
     const lineNo = i + 1;
     const rawLine = lines[i];
@@ -155,9 +176,17 @@ function parseWireguardConfig(text) {
     const valueClean = stripInlineComment(value);
 
     if (currentSection === "interface") {
-      result.interface[keyNorm] = valueClean;
+      if (listKeys.includes(keyNorm) && result.interface[keyNorm]) {
+        result.interface[keyNorm] += ", " + valueClean;
+      } else {
+        result.interface[keyNorm] = valueClean;
+      }
     } else if (currentSection === "peer" && currentPeer !== null) {
-      currentPeer[keyNorm] = valueClean;
+      if (listKeys.includes(keyNorm) && currentPeer[keyNorm]) {
+        currentPeer[keyNorm] += ", " + valueClean;
+      } else {
+        currentPeer[keyNorm] = valueClean;
+      }
     } else {
       result.warnings.push(`Key outside valid section on line ${lineNo} was ignored: ${key.trim()}`);
     }
@@ -179,7 +208,7 @@ function buildXrayConfig(parsed, options = {}) {
   const iface = parsed.interface || {};
   const peers = parsed.peers || [];
 
-  const privateKey = (iface.privatekey || "").trim();
+  const privateKey = (iface.privatekey || iface.secretkey || iface.privkey || "").trim();
   if (!privateKey) {
     throw new Error("PrivateKey not found in [Interface] section.");
   }
@@ -195,18 +224,23 @@ function buildXrayConfig(parsed, options = {}) {
     domainStrategy: VALID_DOMAIN_STRATEGIES.includes(domainStrategy) ? domainStrategy : "ForceIP",
   };
 
-  const addresses = splitCsv(iface.address || "");
+  const addresses = splitCsv(iface.address || iface.ip || iface.localaddress || iface.localip || iface.addresses || "");
   if (addresses.length > 0) {
     settings.address = addresses;
   } else {
     warnings.push("Address not found in [Interface]; Xray will use its default value.");
   }
 
-  const mtuSource = (mtuOverride && mtuOverride.trim()) ? mtuOverride.trim() : (iface.mtu || "").trim();
+  // MTU: Only included when present in original config (or explicit override)
+  const mtuSource = (mtuOverride && String(mtuOverride).trim()) ? String(mtuOverride).trim() : (iface.mtu || "").trim();
   if (mtuSource) {
     settings.mtu = parseMtu(mtuSource);
-  } else if (iface.mtu) {
-    settings.mtu = parseMtu(iface.mtu);
+  }
+
+  // DNS: Transferred to remoteDNS in Xray WireGuard outbound
+  const dnsList = splitCsv(iface.dns || iface.remotedns || iface.dnsserver || iface.nameserver || "");
+  if (dnsList.length > 0) {
+    settings.remoteDNS = dnsList;
   }
 
   let reservedText = iface.reserved || "";
@@ -223,16 +257,12 @@ function buildXrayConfig(parsed, options = {}) {
     settings.reserved = parseReserved(reservedText);
   }
 
-  if (iface.dns) {
-    warnings.push("DNS is not directly transferred to WireGuard outbound; configure a separate dns/routing section in Xray.");
-  }
-
   const xrayPeers = [];
   for (let i = 0; i < peers.length; i++) {
     const peer = peers[i];
     const index = i + 1;
-    const publicKey = (peer.publickey || "").trim();
-    const endpoint = (peer.endpoint || "").trim();
+    const publicKey = (peer.publickey || peer.pubkey || peer.peerpublickey || "").trim();
+    const endpoint = (peer.endpoint || peer.server || peer.peerendpoint || "").trim();
 
     if (!publicKey) {
       throw new Error(`PublicKey not found in Peer number ${index}.`);
@@ -246,17 +276,18 @@ function buildXrayConfig(parsed, options = {}) {
       endpoint,
     };
 
-    const allowedIps = splitCsv(peer.allowedips || "");
+    const allowedIps = splitCsv(peer.allowedips || peer.allowed_ips || peer.allowed || "");
     if (allowedIps.length > 0) {
       xrayPeer.allowedIPs = allowedIps;
     }
 
-    const psk = (peer.presharedkey || "").trim();
+    const psk = (peer.presharedkey || peer.pre_shared_key || peer.psk || "").trim();
     if (psk) {
       xrayPeer.preSharedKey = psk;
     }
 
-    const keepaliveText = (peer.persistentkeepalive || "").trim();
+    // PersistentKeepalive: Only included when present in original config
+    const keepaliveText = (peer.persistentkeepalive || peer.persistent_keepalive || peer.keepalive || "").trim();
     if (keepaliveText) {
       xrayPeer.keepAlive = parseKeepalive(keepaliveText);
     }
@@ -287,7 +318,7 @@ function buildWireguardUri(parsed, options = {}) {
   const iface = parsed.interface || {};
   const peers = parsed.peers || [];
 
-  const privateKey = (iface.privatekey || "").trim();
+  const privateKey = (iface.privatekey || iface.secretkey || iface.privkey || "").trim();
   if (!privateKey) {
     throw new Error("PrivateKey not found in [Interface] section.");
   }
@@ -295,8 +326,11 @@ function buildWireguardUri(parsed, options = {}) {
     throw new Error("No [Peer] section found in WireGuard file.");
   }
 
-  const addresses = splitCsv(iface.address || "");
-  const mtuSource = (mtuOverride && mtuOverride.trim()) ? mtuOverride.trim() : (iface.mtu || "").trim();
+  const addresses = splitCsv(iface.address || iface.ip || iface.localaddress || iface.localip || iface.addresses || "");
+  const dnsList = splitCsv(iface.dns || iface.remotedns || iface.dnsserver || iface.nameserver || "");
+
+  // MTU: Only included when present in original config (or explicit override)
+  const mtuSource = (mtuOverride && String(mtuOverride).trim()) ? String(mtuOverride).trim() : (iface.mtu || "").trim();
   let mtuValue = null;
   if (mtuSource) {
     mtuValue = parseMtu(mtuSource);
@@ -320,8 +354,8 @@ function buildWireguardUri(parsed, options = {}) {
   for (let i = 0; i < peers.length; i++) {
     const peer = peers[i];
     const index = i + 1;
-    const publicKey = (peer.publickey || "").trim();
-    const endpoint = (peer.endpoint || "").trim();
+    const publicKey = (peer.publickey || peer.pubkey || peer.peerpublickey || "").trim();
+    const endpoint = (peer.endpoint || peer.server || peer.peerendpoint || "").trim();
 
     if (!publicKey) {
       throw new Error(`PublicKey not found in Peer number ${index}.`);
@@ -336,26 +370,35 @@ function buildWireguardUri(parsed, options = {}) {
     if (addresses.length > 0) {
       queryParts.push(`address=${encodeURIComponent(addresses.join(","))}`);
     }
+    if (dnsList.length > 0) {
+      queryParts.push(`dns=${encodeURIComponent(dnsList.join(","))}`);
+    }
     if (mtuValue !== null) {
       queryParts.push(`mtu=${encodeURIComponent(mtuValue)}`);
     }
     queryParts.push(`publickey=${encodeURIComponent(publicKey)}`);
 
-    const psk = (peer.presharedkey || "").trim();
+    const psk = (peer.presharedkey || peer.pre_shared_key || peer.psk || "").trim();
     if (psk) {
       queryParts.push(`presharedkey=${encodeURIComponent(psk)}`);
+    }
+
+    const allowedIps = splitCsv(peer.allowedips || peer.allowed_ips || peer.allowed || "");
+    if (allowedIps.length > 0) {
+      queryParts.push(`allowedips=${encodeURIComponent(allowedIps.join(","))}`);
     }
 
     if (reservedNums.length === 3) {
       queryParts.push(`reserved=${encodeURIComponent(reservedNums.join(","))}`);
     }
 
-    const keepaliveText = (peer.persistentkeepalive || "").trim();
+    const keepaliveText = (peer.persistentkeepalive || peer.persistent_keepalive || peer.keepalive || "").trim();
     if (keepaliveText) {
       queryParts.push(`keepalive=${encodeURIComponent(parseKeepalive(keepaliveText))}`);
     }
 
-    const peerTag = peers.length > 1 ? `${(tag && tag.trim()) || "wireguard"}-${index}` : ((tag && tag.trim()) || "wireguard");
+    const baseTag = (tag && tag.trim()) || "wireguard";
+    const peerTag = peers.length > 1 ? `${baseTag}-${index}` : baseTag;
     const uri = `wireguard://${encodedPrivKey}@${endpoint}?${queryParts.join("&")}#${encodeURIComponent(peerTag)}`;
     uris.push(uri);
   }

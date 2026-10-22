@@ -15,13 +15,16 @@ A fast, lightweight, and minimal client-side web application to convert WireGuar
 - **Material Minimal Black Theme**: Deep OLED black palette (`#000000`), subtle borders, high contrast, and clean typography.
 - **100% Client-Side & Private**: Runs entirely in your browser with zero external network requests or server logging.
 - **Drag & Drop + File Picker**: Drop `.conf` or `.txt` files directly or browse from your device.
+- **Automatic Tag from File Name**: The WireGuard tag/remark is automatically detected from the uploaded configuration file name (without extension), with support for custom manual overrides.
+- **Clean Conversion (No Extra Setting Injection)**: Extra parameters like `MTU` and `PersistentKeepalive` are only included in the converted output if they were explicitly configured in the original WireGuard file. No arbitrary default values are forced into your converted configuration.
+- **Comprehensive WireGuard Parameter Support**:
+  - Full multi-line and comma-separated `Address`, `DNS` (mapped to Xray `remoteDNS` and URI `dns`), and `AllowedIPs`.
+  - Supports standard and alternative parameter names (`PrivateKey`/`SecretKey`, `PublicKey`/`Pubkey`, `PersistentKeepalive`/`Keepalive`, `PresharedKey`/`Psk`, etc.).
+  - WireGuard Reserved Bytes: Supports both comma/bracket lists (`[1, 2, 3]`) and 4-character base64 representations (e.g. `AAAA`).
 - **Configurable Outbound Options**:
-  - `tag` (default: `owner`)
   - `domainStrategy` (`ForceIP`, `ForceIPv4`, `ForceIPv6`, `ForceIPv4v6`, `ForceIPv6v4`)
-  - `mtu` (auto-detected from `[Interface]` with manual override support)
   - `noKernelTun` (enabled by default for Windows & client environments)
   - `wrapInOutbounds` (optionally wrap in `{"outbounds": [ ... ]}`)
-- **WireGuard Reserved Bytes**: Automatically extracts `Reserved` bytes (e.g. `[1, 2, 3]`) from either `[Interface]` or `[Peer]` sections.
 - **Multi-Peer Support**: Accurately parses and maps all peers with endpoints, allowed IPs, pre-shared keys, and persistent keepalive.
 - **Syntax Highlighting & Export**: Instant formatted previews with one-click **Copy Link**, **Copy JSON**, and **Download JSON**.
 

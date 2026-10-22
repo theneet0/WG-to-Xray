@@ -56,10 +56,18 @@ def split_csv(value: str) -> List[str]:
 
 def parse_reserved(value: str) -> List[int]:
     """Parse Reserved = 1,2,3 / [1, 2, 3] / 1 2 3 into exactly three bytes when possible."""
-    value = value.strip().strip("[]")
-    if not value:
+    import base64
+    clean = value.strip().strip("[]").strip()
+    if not clean:
         return []
-    parts = re.split(r"[,\s]+", value)
+    if re.match(r"^[A-Za-z0-9+/]{4}={0,2}$", clean):
+        try:
+            b = list(base64.b64decode(clean))
+            if len(b) == 3:
+                return b
+        except Exception:
+            pass
+    parts = re.split(r"[,\s]+", clean)
     nums: List[int] = []
     for part in parts:
         if not part:
@@ -74,6 +82,7 @@ def parse_reserved(value: str) -> List[int]:
     if len(nums) != 3:
         raise ConversionError(f"Reserved must contain exactly 3 numbers, found {len(nums)}. Value: {value}")
     return nums
+
 
 
 def parse_keepalive(value: str) -> int:
@@ -128,10 +137,18 @@ def parse_wireguard_config(text: str) -> ParseResult:
         key_norm = normalize_key(key)
         value_clean = strip_inline_comment(value)
 
+        list_keys = ["address", "dns", "allowedips"]
+
         if current_section == "interface":
-            result.interface[key_norm] = value_clean
+            if key_norm in list_keys and key_norm in result.interface:
+                result.interface[key_norm] += ", " + value_clean
+            else:
+                result.interface[key_norm] = value_clean
         elif current_section == "peer" and current_peer is not None:
-            current_peer[key_norm] = value_clean
+            if key_norm in list_keys and key_norm in current_peer:
+                current_peer[key_norm] += ", " + value_clean
+            else:
+                current_peer[key_norm] = value_clean
         else:
             result.warnings.append(f"Key outside valid section on line {line_no} was ignored: {key.strip()}")
 
@@ -151,7 +168,7 @@ def build_xray_config(
     interface = parsed.interface
     peers = parsed.peers
 
-    private_key = interface.get("privatekey", "").strip()
+    private_key = (interface.get("privatekey", "") or interface.get("secretkey", "") or interface.get("privkey", "")).strip()
     if not private_key:
         raise ConversionError("PrivateKey not found in [Interface] section.")
 
@@ -165,17 +182,21 @@ def build_xray_config(
         "domainStrategy": domain_strategy if domain_strategy in VALID_DOMAIN_STRATEGIES else "ForceIP",
     }
 
-    addresses = split_csv(interface.get("address", ""))
+    addresses = split_csv(interface.get("address", "") or interface.get("ip", "") or interface.get("localaddress", "") or interface.get("localip", "") or interface.get("addresses", ""))
     if addresses:
         settings["address"] = addresses
     else:
         warnings.append("Address not found in [Interface]; Xray will use its default value.")
 
+    # MTU: Only include when present in original config (or explicit override)
     mtu_source = mtu_override.strip() if mtu_override else interface.get("mtu", "").strip()
     if mtu_source:
         settings["mtu"] = parse_mtu(mtu_source)
-    elif interface.get("mtu"):
-        settings["mtu"] = parse_mtu(interface["mtu"])
+
+    # DNS: Transferred to remoteDNS in Xray WireGuard outbound
+    dns_list = split_csv(interface.get("dns", "") or interface.get("remotedns", "") or interface.get("dnsserver", "") or interface.get("nameserver", ""))
+    if dns_list:
+        settings["remoteDNS"] = dns_list
 
     reserved_text = interface.get("reserved", "")
     if not reserved_text:
@@ -187,13 +208,10 @@ def build_xray_config(
     if reserved_text:
         settings["reserved"] = parse_reserved(reserved_text)
 
-    if interface.get("dns"):
-        warnings.append("DNS is not directly transferred to WireGuard outbound; configure a separate dns/routing section in Xray.")
-
     xray_peers = []
     for index, peer in enumerate(peers, start=1):
-        public_key = peer.get("publickey", "").strip()
-        endpoint = peer.get("endpoint", "").strip()
+        public_key = (peer.get("publickey", "") or peer.get("pubkey", "") or peer.get("peerpublickey", "")).strip()
+        endpoint = (peer.get("endpoint", "") or peer.get("server", "") or peer.get("peerendpoint", "")).strip()
 
         if not public_key:
             raise ConversionError(f"PublicKey not found in Peer number {index}.")
@@ -205,15 +223,16 @@ def build_xray_config(
             "endpoint": endpoint,
         }
 
-        allowed_ips = split_csv(peer.get("allowedips", ""))
+        allowed_ips = split_csv(peer.get("allowedips", "") or peer.get("allowed_ips", "") or peer.get("allowed", ""))
         if allowed_ips:
             xray_peer["allowedIPs"] = allowed_ips
 
-        psk = peer.get("presharedkey", "").strip()
+        psk = (peer.get("presharedkey", "") or peer.get("pre_shared_key", "") or peer.get("psk", "")).strip()
         if psk:
             xray_peer["preSharedKey"] = psk
 
-        keepalive_text = peer.get("persistentkeepalive", "").strip()
+        # PersistentKeepalive: Only include when present in original config
+        keepalive_text = (peer.get("persistentkeepalive", "") or peer.get("persistent_keepalive", "") or peer.get("keepalive", "")).strip()
         if keepalive_text:
             xray_peer["keepAlive"] = parse_keepalive(keepalive_text)
 
@@ -239,8 +258,8 @@ if __name__ == "__main__":
         sys.exit(0)
     parsed = parse_wireguard_config(input_text)
     file_mtu = parsed.interface.get("mtu", "").strip()
-    cli_mtu = sys.argv[3] if len(sys.argv) > 3 else "1420"
-    mtu_value = file_mtu or cli_mtu
+    cli_mtu = sys.argv[3].strip() if len(sys.argv) > 3 and sys.argv[3].strip() else None
+    mtu_value = cli_mtu or file_mtu or None
 
     config, warnings = build_xray_config(
         parsed,

@@ -85,6 +85,31 @@ Endpoint = 9.9.9.9:51820
   {
     name: "CR-only line endings (classic Mac)",
     conf: "[Interface]\rPrivateKey = secret44444444secret44444444secret44444444se=\rAddress = 10.0.0.4/32\r[Peer]\rPublicKey = pub44444444pub44444444pub44444444pub44444444pu=\rEndpoint = 4.4.4.4:51820\r"
+  },
+  {
+    name: "Repeated Address, DNS, AllowedIPs and base64 reserved",
+    conf: `[Interface]
+PrivateKey = aaaaaaaa11111111aaaaaaaa11111111aaaaaaaa11=
+Address = 10.0.0.2/32
+Address = fd00::2/128
+DNS = 1.1.1.1
+DNS = 8.8.8.8
+Reserved = AAAA
+[Peer]
+PublicKey = bbbbbbbb22222222bbbbbbbb22222222bbbbbbbb22=
+Endpoint = 198.51.100.1:51820
+AllowedIPs = 0.0.0.0/0
+AllowedIPs = ::/0`
+  },
+  {
+    name: "Aliases (SecretKey, Pubkey, Keepalive) and no MTU",
+    conf: `[Interface]
+SecretKey = cccccccc33333333cccccccc33333333cccccccc33=
+LocalAddress = 192.168.1.5/24
+[Peer]
+Pubkey = dddddddd44444444dddddddd44444444dddddddd44=
+Server = vpn.example.com:51820
+Keepalive = 30`
   }
 ];
 
@@ -92,7 +117,7 @@ let allPassed = true;
 
 for (const tc of testCases) {
   console.log(`Testing: ${tc.name}`);
-  const pyResultStr = execSync(`python py_ref.py wireguard ForceIP 1420 true false`, {
+  const pyResultStr = execSync(`python py_ref.py wireguard ForceIP "" true false`, {
     input: tc.conf,
     encoding: "utf-8"
   });
@@ -102,7 +127,7 @@ for (const tc of testCases) {
   const jsBuilt = converter.buildXrayConfig(jsParsed, {
     tag: "wireguard",
     domainStrategy: "ForceIP",
-    mtuOverride: jsParsed.interface.mtu || "1420",
+    mtuOverride: null,
     noKernelTun: true,
     wrapInOutbounds: false
   });
@@ -220,6 +245,43 @@ if (uris[0] === expectedUri) {
   console.error("  Got:     ", uris[0]);
   console.error("  Expected:", expectedUri);
   allPassed = false;
+}
+
+// Test URI generation without MTU and without keepalive
+console.log("\nTesting URI Generation without extra settings (MTU, keepalive):");
+const minimalConf = `[Interface]
+PrivateKey = 8Mn46OZH7DTRrHPAejXiGZ1Ide/GCBawNt6NDHJpfU8=
+Address = 10.0.0.2/32
+
+[Peer]
+PublicKey = bwanSi8gvcFJkSBbC5K0ED/gZ7r8tNq8Twp3YqOigEQ=
+Endpoint = vip.jojo-data.com:46341
+`;
+const parsedMinimal = converter.parseWireguardConfig(minimalConf);
+const minimalUris = converter.buildWireguardUri(parsedMinimal, { tag: "germany" });
+const minimalXray = converter.buildXrayConfig(parsedMinimal, { tag: "germany", wrapInOutbounds: false });
+
+if (minimalUris[0].includes("mtu=")) {
+  console.error("  ❌ URI should NOT contain mtu when not in config!");
+  allPassed = false;
+} else if (minimalUris[0].includes("keepalive=")) {
+  console.error("  ❌ URI should NOT contain keepalive when not in config!");
+  allPassed = false;
+} else if (!minimalUris[0].endsWith("#germany")) {
+  console.error("  ❌ URI tag should match 'germany'!");
+  allPassed = false;
+} else {
+  console.log("  ✅ URI correctly omits mtu and keepalive, and uses filename tag!");
+}
+
+if ("mtu" in minimalXray.config.settings) {
+  console.error("  ❌ Xray config should NOT contain mtu when not in config!");
+  allPassed = false;
+} else if ("keepAlive" in minimalXray.config.settings.peers[0]) {
+  console.error("  ❌ Xray peer should NOT contain keepAlive when not in config!");
+  allPassed = false;
+} else {
+  console.log("  ✅ Xray JSON correctly omits mtu and keepAlive when not in config!");
 }
 
 if (!allPassed) {
