@@ -1,8 +1,12 @@
 # wg-to-xray
 
+[![Launch Web App](https://img.shields.io/badge/Launch%20Web%20App-theneet0.github.io%2Fwg--to--xray-000000?style=for-the-badge&logo=googlechrome&logoColor=white)](https://theneet0.github.io/wg-to-xray/)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![GitHub Pages](https://img.shields.io/badge/Demo-GitHub%20Pages-black?logo=github)](https://theneet0.github.io/wg-to-xray/)
+[![GitHub Pages](https://img.shields.io/badge/Status-Online-brightgreen?logo=github)](https://theneet0.github.io/wg-to-xray/)
 [![Xray-core Compatibility](https://img.shields.io/badge/Xray--core-v1.8%2B%20%7C%20v24%2B-blueviolet)](https://github.com/XTLS/Xray-core)
+
+> 🚀 **Quick Access:** [**Open wg-to-xray in Browser**](https://theneet0.github.io/wg-to-xray/) &mdash; Convert `.conf` profiles directly without installation.
 
 A client-side converter that parses standard WireGuard configuration files (`.conf`) into [Xray-core](https://github.com/XTLS/Xray-core) outbound JSON objects and standard `wireguard://` client connection URIs.
 
@@ -118,8 +122,8 @@ wireguard://aaaaaa...%3D@198.51.100.1:51820?address=172.16.0.2%2F32%2Cfd00%3A%3A
 ## Deployment & Usage
 
 ### Web Interface
-Access the static application directly via GitHub Pages:
-[https://theneet0.github.io/wg-to-xray/](https://theneet0.github.io/wg-to-xray/)
+Open the application directly in your web browser:
+&rarr; **[https://theneet0.github.io/wg-to-xray/](https://theneet0.github.io/wg-to-xray/)**
 
 ### Running Locally
 Because the project contains no build steps, compilers, or heavy node runtimes, it can be hosted using any static file server:
