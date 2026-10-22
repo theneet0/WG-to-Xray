@@ -241,4 +241,59 @@ if (elements["fileInput"].value !== "") {
 }
 console.log("  ✅ openFilePicker clears fileInput.value to ensure re-selecting same file fires change event!");
 
+// 6. Test Comprehensive WireGuard Parameter Support (Requirement 4)
+console.log("\nTesting Comprehensive WireGuard Parameter Support (Requirement 4):");
+// Test base64url reserved
+const b64urlReserved = sandbox.parseReserved("a-b_");
+if (b64urlReserved.length !== 3 || b64urlReserved[0] !== 107 || b64urlReserved[1] !== 230 || b64urlReserved[2] !== 255) {
+  console.error("❌ Base64URL reserved not parsed correctly! Got:", b64urlReserved);
+  process.exit(1);
+}
+console.log("  ✅ Base64URL reserved bytes parsed correctly:", b64urlReserved);
+
+// Test quoted reserved
+const quotedReserved = sandbox.parseReserved('"1, 2, 3"');
+if (quotedReserved.length !== 3 || quotedReserved[0] !== 1 || quotedReserved[1] !== 2 || quotedReserved[2] !== 3) {
+  console.error("❌ Quoted reserved not parsed correctly! Got:", quotedReserved);
+  process.exit(1);
+}
+console.log("  ✅ Quoted reserved parsed correctly:", quotedReserved);
+
+// Test conversion with underscores, mixed aliases, and space-separated values
+elements["configText"].value = `[Interface]
+private_key = aaaaaaaa11111111aaaaaaaa11111111aaaaaaaa11=
+Address = 10.0.0.2/32
+IP = fd00::2/128
+LocalAddress = 192.168.1.1/24
+DNS = 1.1.1.1 8.8.8.8
+Reserved = a-b_
+[Peer]
+public-key = bbbbbbbb22222222bbbbbbbb22222222bbbbbbbb22=
+Server = 198.51.100.1:51820
+allowed_ips = 0.0.0.0/0 ::/0
+persistent-keepalive = 15`;
+
+sandbox.doConvert("edge-case.conf");
+
+const jsonHtml = elements["outputJsonPre"].innerHTML;
+const uriText = elements["outputUriPre"].textContent;
+
+if (!jsonHtml.includes("10.0.0.2/32") || !jsonHtml.includes("fd00::2/128") || !jsonHtml.includes("192.168.1.1/24")) {
+  console.error("❌ Missing accumulated addresses in converted JSON!");
+  process.exit(1);
+}
+console.log("  ✅ Multiple mixed address aliases accumulated properly into JSON!");
+
+if (!jsonHtml.includes("1.1.1.1") || !jsonHtml.includes("8.8.8.8")) {
+  console.error("❌ Missing space-separated DNS entries in converted JSON!");
+  process.exit(1);
+}
+console.log("  ✅ Space-separated DNS entries mapped properly into JSON remoteDNS!");
+
+if (!uriText.includes("allowedips=0.0.0.0%2F0%2C%3A%3A%2F0")) {
+  console.error("❌ AllowedIPs not correctly serialized into URI! Got:", uriText);
+  process.exit(1);
+}
+console.log("  ✅ Space-separated AllowedIPs serialized properly into WireGuard URI!");
+
 console.log("\n✅ ALL ADVANCED index.html VALIDATION CHECKS PASSED!");

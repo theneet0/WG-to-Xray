@@ -9,8 +9,61 @@ const VALID_DOMAIN_STRATEGIES = [
   "ForceIPv6v4",
 ];
 
+const INTERFACE_KEY_MAP = {
+  privatekey: "privatekey",
+  secretkey: "privatekey",
+  privkey: "privatekey",
+  address: "address",
+  addresses: "address",
+  ip: "address",
+  ips: "address",
+  localaddress: "address",
+  localip: "address",
+  dns: "dns",
+  remotedns: "dns",
+  dnsserver: "dns",
+  dnsservers: "dns",
+  nameserver: "dns",
+  nameservers: "dns",
+  mtu: "mtu",
+  listenport: "listenport",
+  port: "listenport",
+  reserved: "reserved",
+  xreserved: "reserved",
+  table: "table",
+  fwmark: "fwmark",
+  saveconfig: "saveconfig",
+  preup: "preup",
+  postup: "postup",
+  predown: "predown",
+  postdown: "postdown",
+};
+
+const PEER_KEY_MAP = {
+  publickey: "publickey",
+  pubkey: "publickey",
+  peerpublickey: "publickey",
+  endpoint: "endpoint",
+  server: "endpoint",
+  peerendpoint: "endpoint",
+  serveraddress: "endpoint",
+  remote: "endpoint",
+  host: "endpoint",
+  allowedips: "allowedips",
+  allowedip: "allowedips",
+  allowed: "allowedips",
+  routing: "allowedips",
+  presharedkey: "presharedkey",
+  psk: "presharedkey",
+  sharedkey: "presharedkey",
+  persistentkeepalive: "persistentkeepalive",
+  keepalive: "persistentkeepalive",
+  reserved: "reserved",
+  xreserved: "reserved",
+};
+
 function normalizeKey(key) {
-  return key.trim().toLowerCase().replace(/\s+/g, "");
+  return key.trim().toLowerCase().replace(/[\s_-]+/g, "");
 }
 
 function stripInlineComment(value) {
@@ -27,7 +80,7 @@ function stripInlineComment(value) {
 
 function splitCsv(value) {
   if (!value) return [];
-  return value.split(",").map(item => item.trim()).filter(Boolean);
+  return value.split(/[,\s]+/).map(item => item.trim()).filter(Boolean);
 }
 
 function parseIntegerBase(part) {
@@ -60,26 +113,27 @@ function parseIntegerBase(part) {
   return NaN;
 }
 
+function decodeBase64To3Bytes(str) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const s = str.replace(/-/g, "+").replace(/_/g, "/");
+  if (!/^[A-Za-z0-9+/]{4}$/.test(s)) return null;
+  let n = 0;
+  for (let i = 0; i < 4; i++) {
+    const idx = chars.indexOf(s[i]);
+    if (idx === -1) return null;
+    n = (n << 6) | idx;
+  }
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+
 function parseReserved(value) {
-  let clean = value.trim().replace(/^[\[\]]+|[\[\]]+$/g, "").trim();
+  let clean = value.trim().replace(/^["'\[\]]+|["'\[\]]+$/g, "").trim();
   if (!clean) return [];
 
-  // Support 4-char base64 representation of 3 bytes (e.g. WARP reserved bytes)
-  if (/^[A-Za-z0-9+/]{4}={0,2}$/.test(clean)) {
-    try {
-      let bytes = [];
-      if (typeof Buffer !== "undefined") {
-        bytes = Array.from(Buffer.from(clean, "base64"));
-      } else if (typeof atob !== "undefined") {
-        const binStr = atob(clean);
-        for (let i = 0; i < binStr.length; i++) {
-          bytes.push(binStr.charCodeAt(i));
-        }
-      }
-      if (bytes.length === 3) {
-        return bytes;
-      }
-    } catch (_) {}
+  // Support 4-char base64 and base64url representation of 3 bytes (e.g. WARP reserved bytes)
+  const b64Bytes = decodeBase64To3Bytes(clean);
+  if (b64Bytes) {
+    return b64Bytes;
   }
 
   const parts = clean.split(/[,\s]+/).filter(Boolean);
@@ -176,16 +230,18 @@ function parseWireguardConfig(text) {
     const valueClean = stripInlineComment(value);
 
     if (currentSection === "interface") {
-      if (listKeys.includes(keyNorm) && result.interface[keyNorm]) {
-        result.interface[keyNorm] += ", " + valueClean;
+      const canonicalKey = INTERFACE_KEY_MAP[keyNorm] || keyNorm;
+      if (listKeys.includes(canonicalKey) && result.interface[canonicalKey]) {
+        result.interface[canonicalKey] += ", " + valueClean;
       } else {
-        result.interface[keyNorm] = valueClean;
+        result.interface[canonicalKey] = valueClean;
       }
     } else if (currentSection === "peer" && currentPeer !== null) {
-      if (listKeys.includes(keyNorm) && currentPeer[keyNorm]) {
-        currentPeer[keyNorm] += ", " + valueClean;
+      const canonicalKey = PEER_KEY_MAP[keyNorm] || keyNorm;
+      if (listKeys.includes(canonicalKey) && currentPeer[canonicalKey]) {
+        currentPeer[canonicalKey] += ", " + valueClean;
       } else {
-        currentPeer[keyNorm] = valueClean;
+        currentPeer[canonicalKey] = valueClean;
       }
     } else {
       result.warnings.push(`Key outside valid section on line ${lineNo} was ignored: ${key.trim()}`);

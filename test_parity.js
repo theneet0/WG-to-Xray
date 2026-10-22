@@ -110,6 +110,39 @@ LocalAddress = 192.168.1.5/24
 Pubkey = dddddddd44444444dddddddd44444444dddddddd44=
 Server = vpn.example.com:51820
 Keepalive = 30`
+  },
+  {
+    name: "Base64URL reserved and space-separated parameters",
+    conf: `[Interface]
+private_key = aaaaaaaa11111111aaaaaaaa11111111aaaaaaaa11=
+Address = 10.0.0.2/32 fd00::2/128
+DNS = 1.1.1.1 8.8.8.8
+Reserved = a-b_
+[Peer]
+public-key = bbbbbbbb22222222bbbbbbbb22222222bbbbbbbb22=
+Endpoint = 198.51.100.1:51820
+allowed_ips = 0.0.0.0/0 ::/0
+persistent-keepalive = 20`
+  },
+  {
+    name: "Quoted reserved, mixed aliases, and multiple lines",
+    conf: `[Interface]
+Secret_Key = cccccccc33333333cccccccc33333333cccccccc33=
+Address = 10.0.0.2/32
+IP = fd00::2/128
+LocalAddress = 192.168.1.1/24
+DNS = 1.1.1.1
+NameServer = 8.8.8.8
+Reserved = "1, 2, 3"
+ListenPort = 51820
+[Peer]
+Peer_Public_Key = dddddddd44444444dddddddd44444444dddddddd44=
+Remote = vpn.example.com:51820
+PresharedKey = pskpskpskpskpskpskpskpskpskpskpskpskpsk=
+AllowedIPs = 10.0.0.0/8
+Allowed = 192.168.0.0/16
+Routing = 172.16.0.0/12
+Keep_Alive = 15`
   }
 ];
 

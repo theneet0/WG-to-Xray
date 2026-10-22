@@ -18,9 +18,10 @@ A fast, lightweight, and minimal client-side web application to convert WireGuar
 - **Automatic Tag from File Name**: The WireGuard tag/remark is automatically detected from the uploaded configuration file name (without extension), with support for custom manual overrides.
 - **Clean Conversion (No Extra Setting Injection)**: Extra parameters like `MTU` and `PersistentKeepalive` are only included in the converted output if they were explicitly configured in the original WireGuard file. No arbitrary default values are forced into your converted configuration.
 - **Comprehensive WireGuard Parameter Support**:
-  - Full multi-line and comma-separated `Address`, `DNS` (mapped to Xray `remoteDNS` and URI `dns`), and `AllowedIPs`.
-  - Supports standard and alternative parameter names (`PrivateKey`/`SecretKey`, `PublicKey`/`Pubkey`, `PersistentKeepalive`/`Keepalive`, `PresharedKey`/`Psk`, etc.).
-  - WireGuard Reserved Bytes: Supports both comma/bracket lists (`[1, 2, 3]`) and 4-character base64 representations (e.g. `AAAA`).
+  - Full multi-line, comma-separated, and space-separated `Address`, `DNS` (mapped to Xray `remoteDNS` and URI `dns`), and `AllowedIPs`.
+  - Canonical mapping for standard and alternative key names with spaces, underscores, or hyphens (`PrivateKey`/`SecretKey`/`private_key`, `PublicKey`/`Pubkey`/`public_key`, `PersistentKeepalive`/`Keepalive`/`persistent-keepalive`, `PresharedKey`/`Psk`, `LocalAddress`, `ServerAddress`, etc.).
+  - WireGuard Reserved Bytes: Supports decimal lists (`[1, 2, 3]`, `"1, 2, 3"`), hex notation, and 4-character Base64/Base64URL representations (e.g. `AAAA`, `a-b_`).
+  - Seamless handling of quoted values, inline comments, and mixed aliases without data loss.
 - **Configurable Outbound Options**:
   - `domainStrategy` (`ForceIP`, `ForceIPv4`, `ForceIPv6`, `ForceIPv4v6`, `ForceIPv6v4`)
   - `noKernelTun` (enabled by default for Windows & client environments)

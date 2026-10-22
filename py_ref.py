@@ -35,9 +35,63 @@ class ConversionError(Exception):
     pass
 
 
+INTERFACE_KEY_MAP = {
+    "privatekey": "privatekey",
+    "secretkey": "privatekey",
+    "privkey": "privatekey",
+    "address": "address",
+    "addresses": "address",
+    "ip": "address",
+    "ips": "address",
+    "localaddress": "address",
+    "localip": "address",
+    "dns": "dns",
+    "remotedns": "dns",
+    "dnsserver": "dns",
+    "dnsservers": "dns",
+    "nameserver": "dns",
+    "nameservers": "dns",
+    "mtu": "mtu",
+    "listenport": "listenport",
+    "port": "listenport",
+    "reserved": "reserved",
+    "xreserved": "reserved",
+    "table": "table",
+    "fwmark": "fwmark",
+    "saveconfig": "saveconfig",
+    "preup": "preup",
+    "postup": "postup",
+    "predown": "predown",
+    "postdown": "postdown",
+}
+
+PEER_KEY_MAP = {
+    "publickey": "publickey",
+    "pubkey": "publickey",
+    "peerpublickey": "publickey",
+    "endpoint": "endpoint",
+    "server": "endpoint",
+    "peerendpoint": "endpoint",
+    "serveraddress": "endpoint",
+    "remote": "endpoint",
+    "host": "endpoint",
+    "allowedips": "allowedips",
+    "allowedip": "allowedips",
+    "allowed": "allowedips",
+    "routing": "allowedips",
+    "presharedkey": "presharedkey",
+    "psk": "presharedkey",
+    "sharedkey": "presharedkey",
+    "persistentkeepalive": "persistentkeepalive",
+    "keepalive": "persistentkeepalive",
+    "reserved": "reserved",
+    "xreserved": "reserved",
+}
+
+
 def normalize_key(key: str) -> str:
     """WireGuard keys are case-insensitive for our purposes."""
-    return re.sub(r"\s+", "", key.strip().lower())
+    return re.sub(r"[\s_-]+", "", key.strip().lower())
 
 
 def strip_inline_comment(value: str) -> str:
@@ -51,18 +105,21 @@ def strip_inline_comment(value: str) -> str:
 
 
 def split_csv(value: str) -> List[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
+    if not value:
+        return []
+    return [item.strip() for item in re.split(r"[,\s]+", value) if item.strip()]
 
 
 def parse_reserved(value: str) -> List[int]:
     """Parse Reserved = 1,2,3 / [1, 2, 3] / 1 2 3 into exactly three bytes when possible."""
     import base64
-    clean = value.strip().strip("[]").strip()
+    clean = value.strip().strip("\"'[]").strip()
     if not clean:
         return []
-    if re.match(r"^[A-Za-z0-9+/]{4}={0,2}$", clean):
+    if re.match(r"^[A-Za-z0-9+/_-]{4}={0,2}$", clean):
         try:
-            b = list(base64.b64decode(clean))
+            normalized_b64 = clean.replace("-", "+").replace("_", "/")
+            b = list(base64.b64decode(normalized_b64))
             if len(b) == 3:
                 return b
         except Exception:
@@ -140,15 +197,17 @@ def parse_wireguard_config(text: str) -> ParseResult:
         list_keys = ["address", "dns", "allowedips"]
 
         if current_section == "interface":
-            if key_norm in list_keys and key_norm in result.interface:
-                result.interface[key_norm] += ", " + value_clean
+            canonical_key = INTERFACE_KEY_MAP.get(key_norm, key_norm)
+            if canonical_key in list_keys and canonical_key in result.interface:
+                result.interface[canonical_key] += ", " + value_clean
             else:
-                result.interface[key_norm] = value_clean
+                result.interface[canonical_key] = value_clean
         elif current_section == "peer" and current_peer is not None:
-            if key_norm in list_keys and key_norm in current_peer:
-                current_peer[key_norm] += ", " + value_clean
+            canonical_key = PEER_KEY_MAP.get(key_norm, key_norm)
+            if canonical_key in list_keys and canonical_key in current_peer:
+                current_peer[canonical_key] += ", " + value_clean
             else:
-                current_peer[key_norm] = value_clean
+                current_peer[canonical_key] = value_clean
         else:
             result.warnings.append(f"Key outside valid section on line {line_no} was ignored: {key.strip()}")
 
