@@ -1,6 +1,5 @@
-# wg-to-xray
+# wg-to-xray [![Launch Web App](https://img.shields.io/badge/Launch%20Web%20App-theneet0.github.io%2Fwg--to--xray-000000?style=for-the-badge&logo=googlechrome&logoColor=white)](https://theneet0.github.io/wg-to-xray/)
 
-[![Launch Web App](https://img.shields.io/badge/Launch%20Web%20App-theneet0.github.io%2Fwg--to--xray-000000?style=for-the-badge&logo=googlechrome&logoColor=white)](https://theneet0.github.io/wg-to-xray/)
 
 A client-side converter that parses standard WireGuard configuration files (`.conf`) into [Xray-core](https://github.com/XTLS/Xray-core) outbound JSON objects and standard `wireguard://` client connection URIs.
 
