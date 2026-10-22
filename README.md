@@ -2,12 +2,6 @@
 
 [![Launch Web App](https://img.shields.io/badge/Launch%20Web%20App-theneet0.github.io%2Fwg--to--xray-000000?style=for-the-badge&logo=googlechrome&logoColor=white)](https://theneet0.github.io/wg-to-xray/)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![GitHub Pages](https://img.shields.io/badge/Status-Online-brightgreen?logo=github)](https://theneet0.github.io/wg-to-xray/)
-[![Xray-core Compatibility](https://img.shields.io/badge/Xray--core-v1.8%2B%20%7C%20v24%2B-blueviolet)](https://github.com/XTLS/Xray-core)
-
-> **Quick Access:** [**Open wg-to-xray in Browser**](https://theneet0.github.io/wg-to-xray/) &mdash; Convert `.conf` profiles directly without installation.
-
 A client-side converter that parses standard WireGuard configuration files (`.conf`) into [Xray-core](https://github.com/XTLS/Xray-core) outbound JSON objects and standard `wireguard://` client connection URIs.
 
 Runs entirely in the browser with zero server dependencies, external requests, or network telemetry.
