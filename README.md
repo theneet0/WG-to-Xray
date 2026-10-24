@@ -127,14 +127,11 @@ Because the project contains no build steps, compilers, or heavy node runtimes, 
 git clone https://github.com/theneet0/wg-to-xray.git
 cd wg-to-xray
 
-# Using Python 3
-python -m http.server 8080
-
-# Or using Node.js
+# Using Node.js (zero installation)
 npx serve .
 ```
 
-Open `http://localhost:8080` in any modern web browser.
+Open the local server URL in any modern web browser.
 
 ### Programmatic Usage (Node.js)
 The core parser can also be imported in Node scripts:
@@ -165,13 +162,14 @@ console.log(uris[0]);
 
 ## Test Suite
 
-The conversion logic includes automated test suites validating edge cases, malformed inputs, and parity with a Python reference implementation:
+The conversion logic includes automated test suites validating edge cases, malformed inputs, and DOM/browser runtime assertions:
 
 ```bash
-# Run cross-engine parity tests
-node test_parity.js
+# Run all tests
+npm test
 
-# Run DOM and browser runtime assertions
+# Or run individual suites
+node test_converter.js
 node test_html_script.js
 ```
 

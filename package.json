@@ -1,0 +1,24 @@
+{
+  "name": "wg-to-xray",
+  "version": "1.0.0",
+  "description": "Client-side converter for WireGuard (.conf) to Xray-core outbound JSON & wireguard:// URIs",
+  "main": "converter.js",
+  "scripts": {
+    "test": "node test_converter.js && node test_html_script.js",
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "wireguard",
+    "xray",
+    "xray-core",
+    "v2ray",
+    "warp",
+    "converter"
+  ],
+  "author": "theneet0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theneet0/wg-to-xray.git"
+  }
+}
