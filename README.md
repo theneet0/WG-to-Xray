@@ -160,21 +160,6 @@ console.log(uris[0]);
 
 ---
 
-## Test Suite
-
-The conversion logic includes automated test suites validating edge cases, malformed inputs, and DOM/browser runtime assertions:
-
-```bash
-# Run all tests
-npm test
-
-# Or run individual suites
-node test_converter.js
-node test_html_script.js
-```
-
----
-
 ## License
 
 This project is distributed under the [MIT License](LICENSE).
